@@ -1,26 +1,30 @@
-import { NextRequest, NextResponse } from "next/server";
+// app/api/tasks/route.ts
+import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-export async function POST(req: NextRequest) {
-  // 1) Seguridad: validar token compartido con n8n
-  const auth = req.headers.get("authorization") || "";
-  const token = auth.replace(/^Bearer\s+/i, "");
-  if (token !== process.env.N8N_SHARED_SECRET) {
+function sanitize(value: any): string {
+  if (!value) return "";
+  return String(value).trim().replace(/^=+/, "");
+}
+
+export async function POST(req: Request) {
+  const auth = req.headers.get("authorization");
+  if (auth !== `Bearer ${process.env.N8N_SHARED_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // 2) Leer el body
-  const body = await req.json().catch(() => null);
-  if (!body?.user_email || !body?.title_enhanced) {
-    return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+  const body = await req.json();
+
+  const email = sanitize(body.user_email || body.email);
+  const title = sanitize(body.title_enhanced || body.title);
+
+  if (!email) {
+    return NextResponse.json({ error: "Missing email" }, { status: 400 });
   }
 
-  const { user_email, title_enhanced } = body;
-
-  // 3) Insertar en Supabase
   const { data, error } = await supabaseAdmin
     .from("tasks")
-    .insert({ user_email, title: title_enhanced })
+    .insert([{ user_email: email, title }])
     .select()
     .single();
 
