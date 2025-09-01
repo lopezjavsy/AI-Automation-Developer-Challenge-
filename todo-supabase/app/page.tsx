@@ -19,6 +19,15 @@ export default function Home() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
 
+  // 🔧 Normaliza el identificador: convierte 10 dígitos en +521XXXXXXXXXX
+  function normalizeIdentifier(input: string) {
+    const clean = input.replace(/\D/g, ""); // solo números
+    if (clean.length === 10) {
+      return `+521${clean}`; // lada +52 y el "1" antes del número
+    }
+    return input; // si ya viene normalizado
+  }
+
   useEffect(() => {
     if (!email) return;
     loadTasks();
@@ -26,10 +35,11 @@ export default function Home() {
 
   async function loadTasks() {
     setLoading(true);
+    const identifier = normalizeIdentifier(email); // 👈 se normaliza aquí
     const { data, error } = await supabase
       .from("tasks")
       .select("*")
-      .eq("user_email", email)
+      .eq("user_email", identifier)
       .order("inserted_at", { ascending: false });
 
     if (error) console.error(error);
@@ -39,18 +49,20 @@ export default function Home() {
 
   async function addTask() {
     if (!email) {
-      alert("Please enter your email first.");
+      alert("Please enter your phone number first.");
       return;
     }
     const title = newTitle.trim();
     if (!title) return;
+
+    const identifier = normalizeIdentifier(email); // 👈 normalizar antes de enviar
 
     try {
       // Send task to n8n webhook (AI enrichment happens in the workflow)
       const res = await fetch("https://estoesmerca.app.n8n.cloud/webhook/chat-message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, user_email: email }),
+        body: JSON.stringify({ title, user_email: identifier }),
       });
 
       if (!res.ok) {
@@ -106,7 +118,7 @@ export default function Home() {
     if (error) return console.error(error);
     setTasks((prev) => prev.filter((t) => t.id !== id));
   }
-
+  
   return (
     <main style={{ maxWidth: 720, margin: "40px auto", padding: 16, fontFamily: "Poppins, ui-sans-serif" }}>
       <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 12 }}>AI To-Do App</h1>
